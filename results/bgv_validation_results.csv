@@ -1,0 +1,4 @@
+scheme,poly_mod_degree,plain_modulus,slots,slot_capacity_ok,encrypt_ok,depth1_ok,roundtrip_exact,max_error,verdict,notes
+BGV,4096,786433,2048,True,False,,,,EXCLUDED,Context failed: type object 'SCHEME_TYPE' has no attribute 'BGV'
+BGV,8192,786433,4096,True,False,,,,EXCLUDED,Context failed: type object 'SCHEME_TYPE' has no attribute 'BGV'
+BGV,16384,786433,8192,True,False,,,,EXCLUDED,Context failed: type object 'SCHEME_TYPE' has no attribute 'BGV'
