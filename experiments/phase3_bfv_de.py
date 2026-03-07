@@ -19,26 +19,24 @@ from itertools import combinations
 DATASET = "dataset1"   # change to "dataset2" for D2 run
 
 BATCHES_D1 = {
-    "batch_a": ("datasets/batch_a_100.csv",          "scoring/dataset1/de_baselines/de_baseline_batch_a.csv"),
-    "batch_b": ("datasets/batch_b_400.csv",           "scoring/dataset1/de_baselines/de_baseline_batch_b.csv"),
-    "batch_c": ("datasets/batch_c_801.csv",           "scoring/dataset1/de_baselines/de_baseline_batch_c.csv"),
+    "batch_a": ("datasets/batch_a_100.csv",         "scoring/dataset1/de_baselines/de_baseline_batch_a.csv"),
+    "batch_b": ("datasets/batch_b_400.csv",          "scoring/dataset1/de_baselines/de_baseline_batch_b.csv"),
+    "batch_c": ("datasets/batch_c_801.csv",          "scoring/dataset1/de_baselines/de_baseline_batch_c.csv"),
 }
 
 BATCHES_D2 = {
-    "batch_a": ("datasets/d2_batch_a_100.csv",        "scoring/dataset2/d2_de_baseline_batch_a.csv"),
-    "batch_b": ("datasets/d2_batch_b_400.csv",        "scoring/dataset2/d2_de_baseline_batch_b.csv"),
-    "batch_c": ("datasets/d2_batch_c_1129.csv",       "scoring/dataset2/d2_de_baseline_batch_c.csv"),
+    "batch_a": ("datasets/d2_batch_a_100.csv",       "scoring/dataset2/d2_de_baseline_batch_a.csv"),
+    "batch_b": ("datasets/d2_batch_b_400.csv",       "scoring/dataset2/d2_de_baseline_batch_b.csv"),
+    "batch_c": ("datasets/d2_batch_c_1129.csv",      "scoring/dataset2/d2_de_baseline_batch_c.csv"),
 }
 
 BATCHES = BATCHES_D1 if DATASET == "dataset1" else BATCHES_D2
 
 POLY_MOD_DEGREES = [4096, 8192, 16384]
-PLAIN_MODULUS    = 786433    # prime, 3*2^18+1, NTT-friendly
-SCALE_FACTOR     = 10_000    # encode: round(x * 10000) -> int; decode: int / 10000
+PLAIN_MODULUS    = 786433
+SCALE_FACTOR     = 10_000
 N_RUNS           = 10
 
-# Dataset 1: 5 cancer types, 10 pairs
-# Dataset 2: 2 cancer types (LUSC, LUAD), 1 pair
 CANCER_TYPES_D1 = ["BRCA", "KIRC", "LUAD", "PRAD", "COAD"]
 CANCER_TYPES_D2 = ["LUSC", "LUAD"]
 CANCER_TYPES = CANCER_TYPES_D1 if DATASET == "dataset1" else CANCER_TYPES_D2
@@ -66,22 +64,40 @@ def create_context(poly_mod_degree):
     return ctx, BatchEncoder(ctx)
 
 # ==========================================================
+# HELPERS
+# ==========================================================
+def _ct_kb(ct):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+        fname = f.name
+    ct.save(fname)
+    kb = os.path.getsize(fname) / 1024.0
+    os.unlink(fname)
+    return kb
+
+def _clone_ct(ct, ctx):
+    """Clone a ciphertext via save/load."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
+        fname = f.name
+    ct.save(fname)
+    ct2 = Ciphertext()
+    ct2.load(ctx, fname)
+    os.unlink(fname)
+    return ct2
+
+def _sum_cts(evaluator, cts, ctx):
+    """Sum a list of ciphertexts without mutating the originals."""
+    result = _clone_ct(cts[0], ctx)
+    for ct in cts[1:]:
+        result = evaluator.add(result, ct)
+    return result
+
+# ==========================================================
 # ENCRYPTED DE SCORING
-# Mirrors CKKS structure exactly:
-#   enc_latency  = time to encrypt all samples
-#   exec_latency = time to accumulate sums + subtract (depth-1)
-#   dec_latency  = time to decrypt all pair results
-#   ct_size_kb   = serialised size of one result ciphertext
-#   mae          = mean |BFV_DE - plaintext_DE| across all pairs
-#
-# BFV encoding:
-#   encode: round(float * SCALE_FACTOR) -> int64
-#   decode: int64 / SCALE_FACTOR        -> float
-#   DE(f)  = |sum_A(f) - sum_B(f)| / (n_a * SCALE_FACTOR)
 # ==========================================================
 def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
-    gene_cols = [c for c in df.columns if c != "cancer_type"]
-    n_slots   = encoder.slot_count()
+    gene_cols  = [c for c in df.columns if c != "cancer_type"]
+    n_slots    = encoder.slot_count()
+    n_features = len(gene_cols)
 
     kg        = KeyGenerator(ctx)
     pub_key   = kg.create_public_key()
@@ -91,11 +107,10 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
     decryptor = Decryptor(ctx, sec_key)
 
     def encode_row(row_vals):
-        ints   = [int(round(v * SCALE_FACTOR)) for v in row_vals]
-        padded = ints + [0] * (n_slots - len(ints))
-        pt     = Plaintext()
-        encoder.encode(padded, pt)
-        return pt
+        padded = np.zeros(n_slots, dtype=np.int64)
+        ints   = np.round(np.array(row_vals) * SCALE_FACTOR).astype(np.int64)
+        padded[:len(ints)] = ints
+        return encoder.encode(padded)      # returns Plaintext directly
 
     def encrypt_pt(pt):
         ct = Ciphertext()
@@ -110,7 +125,6 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
         enc[ct_type] = [encrypt_pt(encode_row(row)) for row in group]
     enc_latency = (time.perf_counter() - t0) * 1000
 
-    # CT size from first ciphertext of first group
     ct_size_kb = _ct_kb(enc[cancer_types[0]][0])
 
     # -- Execution -----------------------------------------------------------
@@ -120,19 +134,10 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
     for type_a, type_b in pairs:
         if not enc[type_a] or not enc[type_b]:
             continue
-
-        sum_a = _copy_ct(enc[type_a][0])
-        for v in enc[type_a][1:]:
-            evaluator.add_inplace(sum_a, v)
-
-        sum_b = _copy_ct(enc[type_b][0])
-        for v in enc[type_b][1:]:
-            evaluator.add_inplace(sum_b, v)
-
-        diff = Ciphertext()
-        evaluator.sub(sum_a, sum_b, diff)
-
-        key = f"{type_a}_vs_{type_b}"
+        sum_a = _sum_cts(evaluator, enc[type_a], ctx)
+        sum_b = _sum_cts(evaluator, enc[type_b], ctx)
+        diff  = evaluator.sub(sum_a, sum_b)
+        key         = f"{type_a}_vs_{type_b}"
         de_enc[key] = diff
         n_as[key]   = len(enc[type_a])
     exec_latency = (time.perf_counter() - t0) * 1000
@@ -143,36 +148,15 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
     for key, ct in de_enc.items():
         pt_out = Plaintext()
         decryptor.decrypt(ct, pt_out)
-        raw        = encoder.decode_int64(pt_out)
-        n_features = len(gene_cols)
-        diff_arr   = np.array(raw[:n_features], dtype=np.float64)
-        de_dec[key] = np.abs(diff_arr / (n_as[key] * SCALE_FACTOR))
+        raw         = encoder.decode(pt_out)    # numpy array
+        raw_int     = np.array(raw[:n_features], dtype=np.int64)
+        de_dec[key] = np.abs(raw_int.astype(np.float64) / (n_as[key] * SCALE_FACTOR))
     dec_latency = (time.perf_counter() - t0) * 1000
 
     return enc_latency, exec_latency, dec_latency, ct_size_kb, de_dec
 
-
-def _copy_ct(ct):
-    """Deep copy a ciphertext via serialise/load (SEAL has no native copy)."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-        fname = f.name
-    ct.save(fname)
-    ct2 = Ciphertext()
-    ct2.load(fname)  # context-free load; attach manually if needed
-    os.unlink(fname)
-    return ct2
-
-
-def _ct_kb(ct):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
-        fname = f.name
-    ct.save(fname)
-    kb = os.path.getsize(fname) / 1024.0
-    os.unlink(fname)
-    return kb
-
 # ==========================================================
-# MAE  (identical to CKKS script)
+# MAE
 # ==========================================================
 def compute_mae(de_dec, baseline_df):
     pair_cols = [c for c in baseline_df.columns if c != "gene"]
@@ -218,15 +202,13 @@ for poly_mod in POLY_MOD_DEGREES:
 
         print(f"\nConfig {config_num}/{total_configs} — {batch_name} ({len(df)} samples, {n_features} features)")
 
-        # Overflow check (once per config)
         gene_cols = [c for c in df.columns if c != "cancer_type"]
-        group_sizes = {ct: len(df[df["cancer_type"] == ct]) for ct in CANCER_TYPES}
         max_sum = max(
             int(np.round(df[df["cancer_type"] == ct][gene_cols].values * SCALE_FACTOR).sum(axis=0).max())
             for ct in CANCER_TYPES
         )
         if max_sum >= PLAIN_MODULUS:
-            print(f"  WARNING: overflow risk — max col sum {max_sum:,} >= plain_modulus {PLAIN_MODULUS:,}")
+            print(f"  WARNING: overflow — max col sum {max_sum:,} >= plain_modulus {PLAIN_MODULUS:,}")
         else:
             print(f"  Overflow check OK — max col sum {max_sum:,} < {PLAIN_MODULUS:,}")
 
