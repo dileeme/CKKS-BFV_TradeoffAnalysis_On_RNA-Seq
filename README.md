@@ -1,17 +1,15 @@
-
-
-# 🔐 CKKS / BFV / BGV FHE Tradeoff Analysis
+# 🔐 BFV / CKKS FHE Tradeoff Analysis
 ### Differential Expression Scoring on RNA-Seq Gene Expression Data
 
 > **Author:** Dilen Shankar  
-> **Target:** IEEE T-IFS / Journal of Biomedical Informatics / BMC Bioinformatics  
+> **Target:** BMC Bioinformatics (Research Article — Transcriptome analysis)  
 > **Stack:** TenSEAL · Microsoft SEAL · scikit-learn · pandas · NumPy · Matplotlib
 
 ---
 
 ## 📋 Overview
 
-This project benchmarks three Fully Homomorphic Encryption (FHE) schemes — **CKKS**, **BFV**, and **BGV** — for computing differential expression (DE) scores on RNA-Seq cancer gene expression data under encryption. The goal is to produce a systematic tradeoff analysis of computational performance, ciphertext overhead, and approximation accuracy across varying polynomial modulus degrees and dataset sizes.
+This project benchmarks two Fully Homomorphic Encryption (FHE) schemes — **BFV** and **CKKS** — for computing differential expression (DE) scores on RNA-Seq cancer gene expression data under encryption. The goal is to produce a systematic tradeoff analysis of computational performance, ciphertext storage overhead, and approximation accuracy across varying polynomial modulus degrees and dataset sizes.
 
 The encrypted operation is a **depth-1 computation**: encrypted group mean per cancer type followed by ciphertext subtraction to produce DE scores — without ever decrypting the data mid-computation.
 
@@ -19,7 +17,7 @@ The encrypted operation is a **depth-1 computation**: encrypted group mean per c
 
 ## 🧬 Research Question
 
-> How do FHE scheme choice (CKKS, BFV, BGV), polynomial modulus degree, and dataset size influence computational performance, noise/overflow behavior, ciphertext overhead, and approximation accuracy when applied to differential expression scoring on RNA-Seq gene expression data?
+> How do FHE scheme choice (BFV vs CKKS), polynomial modulus degree, and dataset size influence computational performance, ciphertext storage overhead, and approximation accuracy when applied to differential expression scoring on RNA-Seq gene expression data?
 
 ---
 
@@ -29,79 +27,71 @@ The encrypted operation is a **depth-1 computation**: encrypted group mean per c
 | Property | Value |
 |---|---|
 | Source | UCI Machine Learning Repository (ID 401) |
-| Citation | Fiorini (2016); Weinstein et al. *Nature Genetics* (2013) |
 | Shape | 801 samples × 20,531 features |
-| Cancer Types | BRCA (300), KIRC (146), LUAD (141), PRAD (136), COAD (78) |
-| Features | Anonymous identifiers — gene_0 through gene_20530 |
-| Missing Values | None |
-| Status | ✅ Loaded, preprocessed, batched, baselines computed |
+| Cancer Types | BRCA, KIRC, COAD, LUAD, PRAD |
+| Pairwise Comparisons | C(5,2) = 10 |
+| Cohort Sizes | n ∈ {100, 400, 801} |
+| Status | ✅ Complete |
 
-### Dataset 2 — NCBI GEO RNA-Seq
+### Dataset 2 — TCGA LUSC+LUAD
 | Property | Value |
 |---|---|
-| Source | NCBI Gene Expression Omnibus (GEO) |
-| Requirements | RNA-Seq cancer expression matrix, multiple tumor types, HGNC gene identifiers preferred |
-| Purpose | Eliminates single-dataset generalizability objection for journal reviewers |
-| Status | ⏳ Not yet sourced — Day 1 task |
+| Source | The Cancer Genome Atlas (TCGA), accessed via UCSC Xena Browser |
+| Shape | 1,129 samples × 20,531 features |
+| Cancer Types | LUSC, LUAD |
+| Pairwise Comparisons | C(2,2) = 1 |
+| Cohort Sizes | n ∈ {100, 400, 1129} |
+| Status | ✅ Complete |
 
 ---
 
-## ⚙️ Preprocessing Pipeline (Dataset 1 — Complete)
+## ⚙️ Preprocessing Pipeline
 
 ```
-data.csv (801×20531) ──┐
-                        ├──► merge on sample index ──► top-500 variance features
-labels.csv (801×1)  ──┘         ──► min-max normalize [0,1] ──► shuffle (seed=42)
-                                        ──► batch_a (100) / batch_b (400) / batch_c (801)
+Raw expression matrix
+    ──► log2(x + 1) transform          # variance stabilisation
+    ──► zero-variance feature removal   # plaintext only
+    ──► z-score normalisation           # per sample, zero mean / unit variance
+    ──► batch at n ∈ {100, 400, max}   # three cohort sizes per dataset
 ```
 
-> **Why min-max over log2?** Paper is 60% systems focused. Min-max guarantees CKKS numerical stability. Log2 produces unbounded negative values at low expression levels which destabilize CKKS encoding.
+All preprocessing performed in plaintext prior to encryption. No preprocessing operations performed under encryption.
 
 ---
 
 ## 🔬 Encryption Schemes
 
-| Scheme | Arithmetic | MAE Expected | Notes |
+| Scheme | Arithmetic | PMD Tested | Notes |
 |---|---|---|---|
-| CKKS | Approximate float | Small (< 0.12 at 8192+) | Primary scheme — deep characterization |
-| BFV | Exact integer | 0 (or total failure) | DE scores scaled to int before encryption |
-| BGV | Exact integer | 0 (or total failure) | Same scaling approach as BFV |
+| CKKS | Approximate float | 8192, 16384 | N=4096 excluded — insufficient modulus headroom at 128-bit security |
+| BFV | Exact integer | 4096, 8192, 16384 | Float DE scores scaled by fixed integer factor prior to encoding |
 
-> **BFV/BGV note:** Float DE scores are multiplied by 10⁴ or 10⁶, rounded, encrypted, decrypted, then rescaled. This must be documented explicitly in methodology as it affects cross-scheme MAE comparisons.
+All configurations verified compliant with **128-bit classical security** as defined by the HE Standard (Albrecht et al., 2019) and enforced by Microsoft SEAL parameter validation.
 
 ---
 
-## 📐 Computation Graph
+## 📐 HE Parameter Configurations
 
-```
-Inputs:  Encrypted sample vectors (500 features each)
-         Plaintext group membership labels
-         Plaintext scalar 1/n per group
-
-Step 1:  Σ enc(xᵢ[f])  for i in group_A  →  encrypted sum_A       [depth: 0]
-Step 2:  sum_A × (1/n_A)                  →  encrypted mean_A      [depth: 1]
-Step 3:  mean_A - mean_B                  →  encrypted DE score(f)  [depth: 0]
-
-Total multiplicative depth: 1
-Compatible moduli: 8192, 16384
-```
+| Scheme | N (PMD) | Coefficient Modulus | Scale | Security |
+|---|---|---|---|---|
+| CKKS | 8,192 | [40,30,30,40] = 140 bits | 2^30 | 128-bit |
+| CKKS | 16,384 | [60,40,40,60] = 200 bits | 2^40 | 128-bit |
+| BFV | 4,096 | SEAL default ≤ 109 bits | N/A | 128-bit |
+| BFV | 8,192 | SEAL default ≤ 218 bits | N/A | 128-bit |
+| BFV | 16,384 | SEAL default ≤ 438 bits | N/A | 128-bit |
 
 ---
 
 ## 🧪 Experiment Matrix
 
-**Total: 36 configurations × 10 runs = 360 runs**
+**Total: 300 runs (5 configs × 3 cohort sizes × 2 datasets × 10 runs)**
 
-| Configs | Scheme | Dataset | Moduli | Batches | Runs each |
+| Configs | Scheme | Dataset | PMD | Batches | Runs |
 |---|---|---|---|---|---|
 | 1–6   | CKKS | Dataset 1 | 8192, 16384 | 100, 400, 801 | 10 |
-| 7–12  | CKKS | Dataset 2 | 8192, 16384 | TBD | 10 |
-| 13–18 | BFV  | Dataset 1 | 8192, 16384 | 100, 400, 801 | 10 |
-| 19–24 | BFV  | Dataset 2 | 8192, 16384 | TBD | 10 |
-| 25–30 | BGV  | Dataset 1 | 8192, 16384 | 100, 400, 801 | 10 |
-| 31–36 | BGV  | Dataset 2 | 8192, 16384 | TBD | 10 |
-
-> **Note:** poly_mod_degree=4096 is excluded for CKKS — catastrophic MAE at scale=2³⁰ (formally documented in Phase 1). BFV/BGV 4096 exclusion TBD from parameter validation.
+| 7–12  | CKKS | Dataset 2 | 8192, 16384 | 100, 400, 1129 | 10 |
+| 13–18 | BFV  | Dataset 1 | 4096, 8192, 16384 | 100, 400, 801 | 10 |
+| 19–24 | BFV  | Dataset 2 | 4096, 8192, 16384 | 100, 400, 1129 | 10 |
 
 ---
 
@@ -109,11 +99,13 @@ Compatible moduli: 8192, 16384
 
 | Metric | Description |
 |---|---|
-| `enc_latency_ms` | Time to encrypt one batch of sample vectors |
-| `exec_latency_ms` | Time to compute encrypted DE scores |
-| `dec_latency_ms` | Time to decrypt results |
-| `ct_size_kb` | Ciphertext size on disk |
-| `mae` | Mean absolute error vs plaintext baseline (CKKS only — BFV/BGV should be 0) |
+| `enc_latency_ms` | Wall-clock time to encode and encrypt all samples in cohort |
+| `exec_latency_ms` | Wall-clock time to compute all homomorphic DE scoring operations |
+| `dec_latency_ms` | Wall-clock time to decrypt and decode all results |
+| `ct_size_kb` | Serialised size of a single encrypted sample vector (KB) |
+| `mae` | Mean absolute error vs plaintext baseline, per gene across all pairwise comparisons |
+
+All metrics averaged across 10 runs and reported with ±1 standard deviation. Total latency = enc + exec + dec.
 
 ---
 
@@ -124,21 +116,24 @@ ckks-tradeoff-analysis-rna-seq/
 │
 ├── datasets/
 │   ├── data.csv                        # Raw expression matrix (801×20531)
-│   ├── labels.csv                      # Cancer type labels (801×1)
-│   ├── batch_a_100.csv                 # 100 samples, normalized, top-500 features
+│   ├── labels.csv                      # Cancer type labels
+│   ├── batch_a_100.csv                 # 100 samples, preprocessed
 │   ├── batch_b_400.csv                 # 400 samples
-│   ├── batch_c_801.csv                 # 801 samples (full)
-│   ├── processed_dataset.csv           # Master shuffled reference file
+│   ├── batch_c_801.csv                 # 801 samples (full Dataset 1)
 │   └── de_baselines/
-│       ├── de_baseline_batch_a.csv     # Plaintext DE scores — batch A (500×11)
-│       ├── de_baseline_batch_b.csv     # Plaintext DE scores — batch B (500×11)
-│       └── de_baseline_batch_c.csv     # Plaintext DE scores — batch C (500×11)
+│       ├── de_baseline_batch_a.csv     # Plaintext DE scores — batch A
+│       ├── de_baseline_batch_b.csv     # Plaintext DE scores — batch B
+│       └── de_baseline_batch_c.csv     # Plaintext DE scores — batch C
 │
 ├── experiments/
-│   └── phase3_ckks_de.py               # Phase 3 CKKS experiment ✅ READY TO RUN
+│   ├── phase3_ckks_de.py               # CKKS experiment script
+│   └── phase3_bfv_de.py                # BFV experiment script
 │
 └── results/
-    └── phase3_results.csv              # Phase 3 output (created by script)
+    ├── phase3_ckks_dataset1.csv        # CKKS results — Dataset 1
+    ├── phase3_ckks_dataset2.csv        # CKKS results — Dataset 2
+    ├── phase3_bfv_dataset1.csv         # BFV results — Dataset 1
+    └── phase3_bfv_dataset2.csv         # BFV results — Dataset 2
 ```
 
 ---
@@ -147,57 +142,69 @@ ckks-tradeoff-analysis-rna-seq/
 
 | Phase | Description | Status |
 |---|---|---|
-| Phase 1 | Pilot study — synthetic CKKS benchmarks, primary hypothesis | ✅ Complete |
-| Phase 2 | Dataset 1 prep, batching, plaintext DE baseline | ✅ Complete |
-| Phase 2B | Dataset 2 prep, batching, plaintext DE baseline | ⏳ Not started |
-| Phase 2C | BFV/BGV parameter validation | ⏳ Not started |
-| Phase 3 | CKKS experimentation — 6 configs × 10 runs — Dataset 1 | 🔜 Next |
-| Phase 3B | Full matrix — CKKS + BFV + BGV — both datasets | ⏳ Pending |
-| Phase 4 | Analysis, predictive model, visualizations | ⏳ Pending |
-| Phase 5 | Literature survey | ⏳ Pending — start during Phase 3 compute time |
+| Phase 1 | Pilot study — CKKS parameter validation, 4096 exclusion documented | ✅ Complete |
+| Phase 2 | Dataset 1 prep, batching, plaintext DE baselines | ✅ Complete |
+| Phase 2B | Dataset 2 (TCGA LUSC+LUAD via Xena) prep and baselines | ✅ Complete |
+| Phase 3 | CKKS experiments — both datasets | ✅ Complete |
+| Phase 3B | BFV experiments — both datasets | ✅ Complete |
+| Phase 4 | Analysis, visualisations (5 plots) | ✅ Complete |
+| Phase 5 | Literature review, novelty positioning | ✅ Complete |
+| Manuscript | Methods, Results, Abstract drafted; Discussion/Conclusion pending | 🔜 In progress |
 
 ---
 
-## 🏃 Running Phase 3
+## 📊 Key Results Summary
 
-```bash
-# Activate environment
-cd ckks-tradeoff-analysis-rna-seq
-.\ckks_env\Scripts\activate        # Windows
-source ckks_env/bin/activate       # Linux/Mac
+| Scheme | N | Dataset | Total Latency (ms) | CT Size (KB) | MAE |
+|---|---|---|---|---|---|
+| BFV | 4,096 | D1 | 577.80 | 128 | 2–7 × 10⁻⁶ |
+| BFV | 8,192 | D1 | 1,680.89 | 512 | 2–7 × 10⁻⁶ |
+| BFV | 16,384 | D1 | 5,211.36 | 2,048 | 2–7 × 10⁻⁶ |
+| CKKS | 8,192 | D1 | 8,788.41 | 244 | 1.2–1.3 × 10⁻⁵ |
+| CKKS | 16,384 | D1 | 38,453.92 | 770 | 2.5 × 10⁻⁵ |
 
-# Run Phase 3 CKKS experiments
-python experiments/phase3_ckks_de.py
-```
+**Key findings:**
+- BFV achieves **3.5–7.5× lower total latency** than CKKS across all configurations
+- CKKS ciphertexts are **2.66× smaller** per sample at N=16384 — clear latency–storage tradeoff
+- Execution cost scales with **number of pairwise comparisons C(K,2)**, not sample count
+- CKKS MAE **inverts** with increasing N — larger scale (2^40) introduces more rescaling noise for depth-1 computation
+- BFV MAE is **~10× lower** than CKKS and decreases with cohort size via quantisation noise averaging
 
-> Results are written to `results/phase3_results.csv` **after every single run** — no data loss if it crashes mid-way. Config 6 (16384 × 801 samples) will be the slowest — run it overnight.
+---
+
+## 🖥️ Environment
+
+| Property | Value |
+|---|---|
+| CPU | Intel Core i7-10750H @ 2.60 GHz (6 cores, 12 threads) |
+| RAM | 16 GB |
+| OS | Windows 11, PowerShell via VS Code |
+| Python | 3.12 |
+| FHE Library | TenSEAL 0.3.16 (Microsoft SEAL backend) |
+| Threading | OpenMP multi-core, thread count not pinned |
 
 ---
 
 ## 📚 Key References
 
-| Paper | Relevance |
+| Reference | Role |
 |---|---|
-| Weinstein et al. *Nature Genetics* (2013) — TCGA PANCAN | Primary dataset source — 6000+ citations |
-| Fiorini (2016) — UCI ML Repository | Dataset 1 curation |
-| Blatt et al. *Medical Genomics* (2020) — CKKS for GWAS | Closest prior work — cite and differentiate |
-| Sim et al. *Medical Genomics* (2020) — GWAS with HE | Background — cite |
-| Namazi et al. (2025) — Multi-key HE for genomics | Recent overlap — read carefully |
-| Abinaya & Santhi (2021) — Survey on genomic privacy | Background survey — cite |
+| Albrecht et al. (2019) — HE Standard | Security parameter compliance |
+| Benaissa et al. (2021) — TenSEAL | FHE library citation |
+| Microsoft SEAL | Backend library citation |
+| Goldman et al. (2020) — UCSC Xena Browser | Dataset 2 access portal |
+| Gürsoy et al. (2025) — pQuant, Nature Comms | HE for RNA-seq quantification (differentiate: they do quantification, we do DE benchmarking) |
+| Namazi et al. (2025) — Multi-key HE, Bioinformatics Oxford | Recent overlap — cited and differentiated |
+| Jiang et al. (2022) — FHEBench | Primary benchmarking gap anchor |
+| Krüger et al. (2025) — CKKS vs TFHE | Most recent scheme comparison |
 
 ---
 
 ## 🎯 Publication Target
 
-| Journal | Tier | Notes |
-|---|---|---|
-| IEEE Transactions on Information Forensics & Security | Top-tier stretch | Strong FHE readership |
-| Journal of Biomedical Informatics | Mid-tier strong | Best fit with two datasets |
-| BMC Bioinformatics | Mid-tier achievable | Good impact factor |
-| Computers & Security | Safe fallback | Likely acceptance with full scope |
-
-**Estimated journal publication score (full scope):** `87 / 100`
+**BMC Bioinformatics** — Research Article, Transcriptome analysis category  
+IF: 3.3 (2024) | Desk decision median: ~5 days | Full pipeline: ~4–6 months
 
 ---
 
-*Last updated: Phase 2 complete. Phase 3 ready to run.*
+*Last updated: Manuscript in progress. Methods and Results sections complete. Discussion and Conclusion pending.*
