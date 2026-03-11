@@ -21,30 +21,6 @@ The encrypted operation is a **depth-1 computation**: encrypted group mean per c
 
 ---
 
-## 📊 Datasets
-
-### Dataset 1 — UCI Gene Expression Cancer RNA-Seq
-| Property | Value |
-|---|---|
-| Source | UCI Machine Learning Repository (ID 401) |
-| Shape | 801 samples × 20,531 features |
-| Cancer Types | BRCA, KIRC, COAD, LUAD, PRAD |
-| Pairwise Comparisons | C(5,2) = 10 |
-| Cohort Sizes | n ∈ {100, 400, 801} |
-| Status | ✅ Complete |
-
-### Dataset 2 — TCGA LUSC+LUAD
-| Property | Value |
-|---|---|
-| Source | The Cancer Genome Atlas (TCGA), accessed via UCSC Xena Browser |
-| Shape | 1,129 samples × 20,531 features |
-| Cancer Types | LUSC, LUAD |
-| Pairwise Comparisons | C(2,2) = 1 |
-| Cohort Sizes | n ∈ {100, 400, 1129} |
-| Status | ✅ Complete |
-
----
-
 ## ⚙️ Preprocessing Pipeline
 
 ```
