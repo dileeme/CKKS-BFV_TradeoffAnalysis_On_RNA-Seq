@@ -83,54 +83,7 @@ All configurations verified compliant with **128-bit classical security** as def
 
 All metrics averaged across 10 runs and reported with ±1 standard deviation. Total latency = enc + exec + dec.
 
----
-
-## 📁 Project Structure
-
-
-project-root/
-│
-├── datasets/
-│   ├── batch_a_100.csv
-│   ├── batch_b_400.csv
-│   ├── batch_c_801.csv
-│   ├── dataset2_batch_a_100.csv
-│   ├── dataset2_batch_b_400.csv
-│   ├── dataset2_batch_c_1129.csv
-│   ├── data.csv
-│   ├── labels.csv
-│   └── de_baselines/
-│       ├── de_baseline_batch_a.csv
-│       ├── de_baseline_batch_b.csv
-│       ├── de_baseline_batch_c.csv
-│       ├── de_baseline_dataset2_batch_a.csv
-│       ├── de_baseline_dataset2_batch_b.csv
-│       └── de_baseline_dataset2_batch_c.csv
-│
-├── experiments/
-│   ├── phase3_ckks_de.py
-│   └── phase3_bfv_de.py
-│
-├── figures/
-│   ├── plot1_enc_latency.png
-│   ├── plot2_exec_latency.png
-│   ├── plot3_ct_size.png
-│   ├── plot4_total_latency.png
-│   └── plot5_mae.png
-│
-├── results/
-│   ├── phase3_ckks_dataset1.csv
-│   ├── phase3_ckks_dataset2.csv
-│   ├── phase3_bfv_dataset1.csv
-│   └── phase3_bfv_dataset2.csv
-│
-├── manuscript/
-│   ├── sn-article.tex
-│   ├── sn-article.pdf
-│   └── sn-bibliography.bib
-│
-└── README.md
-
+--
 
 
 ## 🚦 Phase Status
