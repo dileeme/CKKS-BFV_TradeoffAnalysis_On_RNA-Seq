@@ -1,0 +1,15 @@
+model,scheme,pmd,x_var,y_var,slope,intercept,R2,p_value,n_points,equation
+M1_enc_vs_samples,BFV,4096,samples,enc_latency_ms,1.243522,6.2618,0.996685,4e-06,6,y = 1.244·x + 6.26
+M1_enc_vs_samples,BFV,8192,samples,enc_latency_ms,3.467483,78.3659,0.996928,4e-06,6,y = 3.467·x + 78.37
+M1_enc_vs_samples,BFV,16384,samples,enc_latency_ms,12.168776,-137.7498,0.996063,6e-06,6,y = 12.169·x + -137.75
+M1_enc_vs_samples,CKKS,8192,samples,enc_latency_ms,4.644089,23.7849,0.999114,0.0,6,y = 4.644·x + 23.78
+M1_enc_vs_samples,CKKS,16384,samples,enc_latency_ms,13.052829,162.0642,0.979785,0.000154,6,y = 13.053·x + 162.06
+M2_ckks_exec_vs_pairs,CKKS,8192,pairs,exec_latency_ms,669.6714,-5.0234,1.0,0.0,2,y = 669.671·x + -5.02
+M2_ckks_exec_vs_pairs,CKKS,16384,pairs,exec_latency_ms,3243.720769,-351.1015,1.0,0.0,2,y = 3243.721·x + -351.10
+M3_bfv_exec_vs_samples,BFV,4096,samples,exec_latency_ms,0.02729,0.1753,0.982976,0.000109,6,y = 0.027·x + 0.18
+M3_bfv_exec_vs_samples,BFV,8192,samples,exec_latency_ms,0.100452,6.2339,0.980312,0.000146,6,y = 0.100·x + 6.23
+M3_bfv_exec_vs_samples,BFV,16384,samples,exec_latency_ms,0.53629,-14.1692,0.987419,6e-05,6,y = 0.536·x + -14.17
+M4_ct_vs_pmd,BFV,all,poly_mod_degree,ct_size_kb,1.999417,0.0,1.0,6.4e-05,3,y = 0.00 · x^1.999
+M4_ct_vs_pmd,CKKS,all,poly_mod_degree,ct_size_kb,1.655819,0.0001,1.0,0.0,2,y = 0.00 · x^1.656
+M5_enc_vs_pmd,BFV,all,poly_mod_degree,enc_latency_ms,1.628639,0.0002,0.99963,0.012253,3,y = 0.00 · x^1.629
+M5_enc_vs_pmd,CKKS,all,poly_mod_degree,enc_latency_ms,1.483475,0.0008,1.0,0.0,2,y = 0.00 · x^1.483
