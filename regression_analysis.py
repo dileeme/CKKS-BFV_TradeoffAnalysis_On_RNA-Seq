@@ -1,7 +1,4 @@
 """
-Regression analysis for BFV vs CKKS latency scaling.
-Outputs: results/regression_results.csv + printed summary table.
-
 Models:
   M1 — Enc latency ~ sample count (linear, per scheme x PMD)
   M2 — CKKS exec latency ~ pair count (linear, per PMD, using D1/D2 means)
@@ -13,14 +10,12 @@ import numpy as np
 from scipy import stats
 import os
 
-# ── Load ───────────────────────────────────────────────────────────────────
 bfv1  = pd.read_csv('results/phase3_bfv_dataset1.csv')
 bfv2  = pd.read_csv('results/phase3_bfv_dataset2.csv')
 ckks1 = pd.read_csv('results/phase3_ckks_dataset1.csv')
 ckks2 = pd.read_csv('results/phase3_ckks_dataset2.csv')
 all_data = pd.concat([bfv1, bfv2, ckks1, ckks2], ignore_index=True)
 
-# Per-run means across configs
 means = (all_data
     .groupby(['dataset','scheme','poly_mod_degree','samples'])
     .agg(enc=('enc_latency_ms','mean'),
@@ -63,15 +58,14 @@ def power_fit(x, y, label, x_label, y_label, scheme):
         'pmd':         'all',
         'x_var':       x_label,
         'y_var':       y_label,
-        'slope':       round(slope, 6),   # = exponent k
-        'intercept':   round(a, 4),       # = coefficient a
+        'slope':       round(slope, 6),   
+        'intercept':   round(a, 4),       
         'R2':          round(r2, 6),
         'p_value':     round(p, 6),
         'n_points':    len(x),
         'equation':    f'y = {a:.2f} · x^{slope:.3f}',
     }
 
-# ── M1: Enc latency vs sample count ───────────────────────────────────────
 print("=== M1: Enc latency ~ sample count ===")
 for scheme in ['BFV', 'CKKS']:
     pmds = means[means['scheme']==scheme]['poly_mod_degree'].unique()
@@ -84,8 +78,8 @@ for scheme in ['BFV', 'CKKS']:
         results.append(r)
         print(f"  {scheme} PMD={pmd}: {r['equation']}  R²={r['R2']:.4f}")
 
-# ── M2: CKKS exec latency vs pair count ───────────────────────────────────
-# D1=10 pairs, D2=1 pair. Use mean across all samples per dataset+PMD.
+# ── M2 ───────────────────────────────────
+
 print("\n=== M2: CKKS exec ~ pair count ===")
 pair_map = {'dataset1': 10, 'dataset2': 1}
 for pmd in [8192, 16384]:
@@ -98,7 +92,7 @@ for pmd in [8192, 16384]:
     results.append(r)
     print(f"  CKKS PMD={pmd}: {r['equation']}  R²={r['R2']:.4f}  (only 2 pts — ratio confirms N3)")
 
-# ── M3: BFV exec latency vs sample count ──────────────────────────────────
+# ── M3 ──────────────────────────────────
 print("\n=== M3: BFV exec ~ sample count ===")
 for pmd in [4096, 8192, 16384]:
     sub = means[(means['scheme']=='BFV') & (means['poly_mod_degree']==pmd)]
@@ -108,7 +102,7 @@ for pmd in [4096, 8192, 16384]:
     results.append(r)
     print(f"  BFV PMD={pmd}: {r['equation']}  R²={r['R2']:.4f}")
 
-# ── M4: CT size vs PMD (power law) ────────────────────────────────────────
+# ── M4 ────────────────────────────────────────
 print("\n=== M4: CT size ~ PMD (power law, log-log) ===")
 ct_by_pmd = (all_data
     .groupby(['scheme','poly_mod_degree'])['ct_size_kb']
@@ -121,7 +115,7 @@ for scheme in ['BFV', 'CKKS']:
     results.append(r)
     print(f"  {scheme}: {r['equation']}  R²={r['R2']:.4f}  (exponent={r['slope']:.3f})")
 
-# ── M5: Enc latency vs PMD (power law) ────────────────────────────────────
+# ── M5 ────────────────────────────────────
 print("\n=== M5: Enc latency ~ PMD (power law, per scheme, n=100 baseline) ===")
 enc_pmd = means[means['samples']==100].groupby(['scheme','poly_mod_degree'])['enc'].mean().reset_index()
 for scheme in ['BFV','CKKS']:
@@ -131,7 +125,6 @@ for scheme in ['BFV','CKKS']:
     results.append(r)
     print(f"  {scheme}: {r['equation']}  R²={r['R2']:.4f}  (exponent={r['slope']:.3f})")
 
-# ── Save ───────────────────────────────────────────────────────────────────
 df_results = pd.DataFrame(results)
 os.makedirs('results', exist_ok=True)
 df_results.to_csv('results/regression_results.csv', index=False)
