@@ -1,10 +1,4 @@
-"""
-Models:
-  M1 — Enc latency ~ sample count (linear, per scheme x PMD)
-  M2 — CKKS exec latency ~ pair count (linear, per PMD, using D1/D2 means)
-  M3 — BFV exec latency ~ sample count (linear, per PMD)
-  M4 — CT size ~ PMD (power law via log-log, per scheme)
-"""
+
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -66,11 +60,10 @@ def power_fit(x, y, label, x_label, y_label, scheme):
         'equation':    f'y = {a:.2f} · x^{slope:.3f}',
     }
 
-print("=== M1: Enc latency ~ sample count ===")
+print(" M1: Enc latency ~ sample count")
 for scheme in ['BFV', 'CKKS']:
     pmds = means[means['scheme']==scheme]['poly_mod_degree'].unique()
     for pmd in sorted(pmds):
-        # Use all datasets combined for more data points
         sub = means[(means['scheme']==scheme) & (means['poly_mod_degree']==pmd)]
         r = linear_fit(sub['samples'].values, sub['enc'].values,
                        'M1_enc_vs_samples', 'samples', 'enc_latency_ms',
@@ -78,9 +71,7 @@ for scheme in ['BFV', 'CKKS']:
         results.append(r)
         print(f"  {scheme} PMD={pmd}: {r['equation']}  R²={r['R2']:.4f}")
 
-# ── M2 ───────────────────────────────────
-
-print("\n=== M2: CKKS exec ~ pair count ===")
+print("\nM2: CKKS exec ~ pair count")
 pair_map = {'dataset1': 10, 'dataset2': 1}
 for pmd in [8192, 16384]:
     sub = (means[(means['scheme']=='CKKS') & (means['poly_mod_degree']==pmd)]
@@ -92,8 +83,7 @@ for pmd in [8192, 16384]:
     results.append(r)
     print(f"  CKKS PMD={pmd}: {r['equation']}  R²={r['R2']:.4f}  (only 2 pts — ratio confirms N3)")
 
-# ── M3 ──────────────────────────────────
-print("\n=== M3: BFV exec ~ sample count ===")
+print("\n M3: BFV exec ~ sample count")
 for pmd in [4096, 8192, 16384]:
     sub = means[(means['scheme']=='BFV') & (means['poly_mod_degree']==pmd)]
     r = linear_fit(sub['samples'].values, sub['exec'].values,
@@ -101,9 +91,7 @@ for pmd in [4096, 8192, 16384]:
                    'BFV', pmd)
     results.append(r)
     print(f"  BFV PMD={pmd}: {r['equation']}  R²={r['R2']:.4f}")
-
-# ── M4 ────────────────────────────────────────
-print("\n=== M4: CT size ~ PMD (power law, log-log) ===")
+print("\nM4: CT size ~ PMD (power law, log-log)")
 ct_by_pmd = (all_data
     .groupby(['scheme','poly_mod_degree'])['ct_size_kb']
     .mean().reset_index())
@@ -114,9 +102,7 @@ for scheme in ['BFV', 'CKKS']:
                   'M4_ct_vs_pmd', 'poly_mod_degree', 'ct_size_kb', scheme)
     results.append(r)
     print(f"  {scheme}: {r['equation']}  R²={r['R2']:.4f}  (exponent={r['slope']:.3f})")
-
-# ── M5 ────────────────────────────────────
-print("\n=== M5: Enc latency ~ PMD (power law, per scheme, n=100 baseline) ===")
+print("\n M5: Enc latency ~ PMD (power law, per scheme, n=100 baseline)")
 enc_pmd = means[means['samples']==100].groupby(['scheme','poly_mod_degree'])['enc'].mean().reset_index()
 for scheme in ['BFV','CKKS']:
     sub = enc_pmd[enc_pmd['scheme']==scheme].sort_values('poly_mod_degree')
