@@ -97,7 +97,6 @@ All metrics averaged across 10 runs and reported with ±1 standard deviation. To
 | Phase 3B | BFV experiments — both datasets | ✅ Complete |
 | Phase 4 | Analysis, visualisations (5 plots) | ✅ Complete |
 | Phase 5 | Literature review, novelty positioning | ✅ Complete |
-| Manuscript | Methods, Results, Abstract drafted; Discussion/Conclusion pending | 🔜 In progress |
 
 --
 
