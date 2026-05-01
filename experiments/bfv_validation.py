@@ -27,18 +27,14 @@ import numpy as np
 import pandas as pd
 import os, time, tempfile
 
-# ==========================================================
-# CONFIGURATION
-# ==========================================================
 SCALE_FACTOR     = 10_000
-N_FEATURES       = 500        # top-variance features, fixed from Phase 2
-N_SAMPLES_TEST   = 100        # synthetic batch matching batch_a
+N_FEATURES       = 500        
+N_SAMPLES_TEST   = 100        
 RANDOM_STATE     = 42
-REPEATS          = 6          # matches NumRuns in pilot_results.csv
-MAE_THRESHOLD    = 1.0 / SCALE_FACTOR   # 1e-4 — rounding noise only
+REPEATS          = 6          
+MAE_THRESHOLD    = 1.0 / SCALE_FACTOR  
 
-# plain_modulus = 786_433  (prime, 3*2^18+1, NTT-friendly)
-# Max intermediate col sum = 50 * 9_000 = 450_000 < 786_433 — safe
+
 PLAIN_MODULUS    = 786433
 POLY_MOD_DEGREES = [4096, 8192, 16384]
 
@@ -47,9 +43,6 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 np.random.seed(RANDOM_STATE)
 
-# ==========================================================
-# CONTEXT
-# ==========================================================
 def create_context(poly_mod_degree, plain_modulus):
     try:
         parms = EncryptionParameters(scheme_type.bfv)
@@ -63,11 +56,6 @@ def create_context(poly_mod_degree, plain_modulus):
     except Exception:
         return None, None
 
-# ==========================================================
-# SYNTHETIC RNA-SEQ-LIKE DATA
-# Two cancer groups, floats in [0,1] after min-max norm.
-# Encoded as int64 via SCALE_FACTOR — mirrors Phase 2 preprocessing.
-# ==========================================================
 def make_data(n_samples, n_features, seed):
     rng   = np.random.default_rng(seed)
     n_a   = n_samples // 2
@@ -90,10 +78,6 @@ def ct_size_kb(ct):
     os.unlink(fname)
     return kb
 
-# ==========================================================
-# BENCHMARK LOOP — one poly_mod_degree at a time
-# Mirrors the enc / exec / dec benchmark structure of program1
-# ==========================================================
 def run_config(poly_mod_degree):
 
     print(f"\n========== BFV VALIDATION: poly_mod_degree={poly_mod_degree} ==========")
@@ -124,9 +108,6 @@ def run_config(poly_mod_degree):
 
     n_slots = encoder.slot_count()
     print(f"Slots available           : {n_slots:,}")
-
-    # Slot capacity check — need n_slots >= N_FEATURES to fit one sample per CT
-    if n_slots < N_FEATURES:
         row["Notes"] = f"EXCLUDED -- {n_slots} slots < {N_FEATURES} features required"
         print("------------------------------------------------")
         print(f"Slot capacity             : FAIL ({n_slots} < {N_FEATURES})")
@@ -136,7 +117,6 @@ def run_config(poly_mod_degree):
     row["SlotCapacityOK"] = True
     print(f"Slot capacity             : OK ({n_slots} >= {N_FEATURES})")
 
-    # Overflow check — worst-case intermediate sum must stay < plain_modulus
     a0, b0, _, _ = make_data(N_SAMPLES_TEST, N_FEATURES, RANDOM_STATE)
     mx = max_col_sum(a0, b0)
     row["OverflowOK"] = mx < PLAIN_MODULUS
@@ -155,16 +135,10 @@ def run_config(poly_mod_degree):
         enc.encrypt(pt, ct)
         return ct
 
-    # Warm-up — first call always slower due to JIT/cache effects
     a_w, b_w, _, _ = make_data(N_SAMPLES_TEST, N_FEATURES, RANDOM_STATE)
     kg_w = KeyGenerator(ctx)
     enc_w = Encryptor(ctx, kg_w.create_public_key())
     _ = [enc_row(enc_w, r) for r in a_w]
-
-    # ==========================================================
-    # ENCRYPTION BENCHMARK
-    # Time each full batch encryption independently
-    # ==========================================================
     enc_times = []
     for i in range(REPEATS):
         a_i, b_i, _, _ = make_data(N_SAMPLES_TEST, N_FEATURES, RANDOM_STATE + i + 1)
@@ -175,10 +149,6 @@ def run_config(poly_mod_degree):
         cb = [enc_row(enc, r) for r in b_i]
         enc_times.append((time.perf_counter() - start) * 1000)
 
-    # ==========================================================
-    # EXECUTION BENCHMARK
-    # Re-encrypt each iteration for consistent ciphertext state
-    # ==========================================================
     exec_times = []
     for i in range(REPEATS):
         a_i, b_i, _, _ = make_data(N_SAMPLES_TEST, N_FEATURES, RANDOM_STATE + i + 1)
@@ -196,10 +166,6 @@ def run_config(poly_mod_degree):
         ev.sub(sa, sb, cd)
         exec_times.append((time.perf_counter() - start) * 1000)
 
-    # ==========================================================
-    # DECRYPTION BENCHMARK
-    # Compute result once outside loop — benchmark decrypt only
-    # ==========================================================
     a_d, b_d, pt_de, n_a = make_data(N_SAMPLES_TEST, N_FEATURES, RANDOM_STATE + 1)
     kg  = KeyGenerator(ctx)
     pk  = kg.create_public_key()
@@ -223,16 +189,12 @@ def run_config(poly_mod_degree):
         dec.decrypt(result, pt_out)
         dec_times.append((time.perf_counter() - start) * 1000)
 
-    # Final decode for MAE and ciphertext size
     decoded = encoder.decode_int64(pt_out)
     diff    = np.array(decoded[:N_FEATURES], dtype=np.float64)
     enc_de  = np.abs(diff / (n_a * SCALE_FACTOR))
     mae     = float(np.mean(np.abs(enc_de - pt_de)))
     size_kb = ct_size_kb(result)
 
-    # ==========================================================
-    # OUTPUT  (mirrors program1 print block exactly)
-    # ==========================================================
     print("------------------------------------------------")
     print(f"Encryption latency  (ms)  : {np.mean(enc_times):.4f}  +- {np.std(enc_times):.4f}")
     print(f"Execution latency   (ms)  : {np.mean(exec_times):.4f}  +- {np.std(exec_times):.4f}")
@@ -253,9 +215,6 @@ def run_config(poly_mod_degree):
     row["Notes"] = "VALID" if row["Valid"] else f"FAIL -- MAE {mae:.4e} >= threshold {MAE_THRESHOLD:.4e}"
     return row
 
-# ==========================================================
-# MAIN — loop over all poly_mod_degrees, save CSV
-# ==========================================================
 print("\n" + "=" * 60)
 print("  BFV PARAMETER VALIDATION  --  Phase 2C")
 print("  CKKS vs BFV  --  RNA-Seq DE Scoring")
