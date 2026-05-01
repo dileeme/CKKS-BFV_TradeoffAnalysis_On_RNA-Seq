@@ -13,11 +13,7 @@ import tempfile
 from tqdm import tqdm
 from itertools import combinations
 
-# ==========================================================
-# CONFIGURATION
-# ==========================================================
-DATASET = "dataset1"   # change to "dataset2" for D2 run
-
+DATASET = "dataset1" 
 BATCHES_D1 = {
     "batch_a": ("datasets/batch_a_100.csv",         "scoring/dataset1/de_baselines/de_baseline_batch_a.csv"),
     "batch_b": ("datasets/batch_b_400.csv",          "scoring/dataset1/de_baselines/de_baseline_batch_b.csv"),
@@ -33,7 +29,7 @@ BATCHES_D2 = {
 BATCHES = BATCHES_D1 if DATASET == "dataset1" else BATCHES_D2
 
 POLY_MOD_DEGREES = [4096, 8192, 16384]
-PLAIN_MODULUS    = 9338881   # prime, NTT-friendly for 4096/8192/16384; must be > 2*max_col_sum (9,304,726)
+PLAIN_MODULUS    = 9338881  
 SCALE_FACTOR     = 10_000
 N_RUNS           = 10
 
@@ -52,9 +48,6 @@ FIELDNAMES = [
     "dec_latency_ms", "ct_size_kb", "mae"
 ]
 
-# ==========================================================
-# CONTEXT
-# ==========================================================
 def create_context(poly_mod_degree):
     parms = EncryptionParameters(scheme_type.bfv)
     parms.set_poly_modulus_degree(poly_mod_degree)
@@ -63,9 +56,6 @@ def create_context(poly_mod_degree):
     ctx = SEALContext(parms)
     return ctx, BatchEncoder(ctx)
 
-# ==========================================================
-# HELPERS
-# ==========================================================
 def _ct_kb(ct):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as f:
         fname = f.name
@@ -91,9 +81,6 @@ def _sum_cts(evaluator, cts, ctx):
         result = evaluator.add(result, ct)
     return result
 
-# ==========================================================
-# ENCRYPTED DE SCORING
-# ==========================================================
 def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
     gene_cols  = [c for c in df.columns if c != "cancer_type"]
     n_slots    = encoder.slot_count()
@@ -110,41 +97,30 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
         padded = np.zeros(n_slots, dtype=np.int64)
         ints   = np.round(np.array(row_vals) * SCALE_FACTOR).astype(np.int64)
         padded[:len(ints)] = ints
-        return encoder.encode(padded)      # int64 array -- matches seal-python API
+        return encoder.encode(padded)     
 
     def encrypt_pt(pt):
         ct = Ciphertext()
         encryptor.encrypt(pt, ct)
         return ct
 
-    # -- Encryption (streaming) + Execution ----------------------------------
-    # Encrypt row-by-row and accumulate immediately to avoid storing all
-    # ciphertexts in RAM (prevents OOM kill at large batches / high PMD).
-    # Timing is split correctly to match CKKS script:
-    #   enc_latency  = pure encode + encrypt time only
-    #   exec_latency = homomorphic add accumulation + final subtraction
     enc_sums    = {}
     n_per       = {}
     first_ct_kb = None
-    enc_elapsed  = 0.0   # accumulate pure encryption time
-    exec_elapsed = 0.0   # accumulate homomorphic add time
+    enc_elapsed  = 0.0 
+    exec_elapsed = 0.0   
 
     for ct_type in cancer_types:
         group = df[df["cancer_type"] == ct_type][gene_cols].values
         n_per[ct_type] = len(group)
         running_sum = None
         for row in group:
-            # -- timed: encode + encrypt only
             t0 = time.perf_counter()
             ct = encrypt_pt(encode_row(row))
             enc_elapsed += (time.perf_counter() - t0) * 1000
 
             if first_ct_kb is None:
                 first_ct_kb = _ct_kb(ct)
-
-            # -- timed: homomorphic addition
-            # First row: running_sum is uninitialised — use ct directly.
-            # No clone needed; ct is local and won't be reused.
             t0 = time.perf_counter()
             if running_sum is None:
                 running_sum = ct
@@ -158,12 +134,6 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
 
     exec_latency = exec_elapsed
     ct_size_kb   = first_ct_kb
-
-    # -- Decryption ----------------------------------------------------------
-    # Decrypt each group sum individually, then compute mean_A - mean_B in plaintext.
-    # This matches CKKS exactly: CKKS computes encrypted(sum/n) then decrypts.
-    # BFV can't do plaintext scalar divide in encrypted domain (integer-only modulus),
-    # so we decrypt the sum and divide by n in plaintext -- mathematically identical.
     t0      = time.perf_counter()
     means   = {}
     for ct_type in cancer_types:
@@ -173,8 +143,6 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
         decryptor.decrypt(enc_sums[ct_type], pt_out)
         raw     = encoder.decode(pt_out)
         raw_int = np.array(raw[:n_features], dtype=np.int64)
-        # Signed correction: BFV values are mod plain_modulus
-        # Negative results wrap to [plain_modulus//2, plain_modulus)
         raw_int[raw_int > PLAIN_MODULUS // 2] -= PLAIN_MODULUS
         means[ct_type] = raw_int.astype(np.float64) / (n_per[ct_type] * SCALE_FACTOR)
     dec_latency = (time.perf_counter() - t0) * 1000
@@ -188,9 +156,6 @@ def run_encrypted_de(ctx, encoder, df, cancer_types, pairs):
 
     return enc_latency, exec_latency, dec_latency, ct_size_kb, de_dec
 
-# ==========================================================
-# MAE
-# ==========================================================
 def compute_mae(de_dec, baseline_df):
     pair_cols = [c for c in baseline_df.columns if c != "gene"]
     errors    = []
@@ -202,9 +167,6 @@ def compute_mae(de_dec, baseline_df):
         errors.append(np.abs(pt - enc).mean())
     return np.mean(errors) if errors else float("nan")
 
-# ==========================================================
-# MAIN
-# ==========================================================
 with open(OUTPUT_FILE, "w", newline="") as f:
     csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
 
