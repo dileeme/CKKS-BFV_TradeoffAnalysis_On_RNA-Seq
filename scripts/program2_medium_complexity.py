@@ -45,10 +45,7 @@ for _ in range(REPEATS):
 exec_latency_mean = np.mean(exec_times)
 exec_latency_std  = np.std(exec_times)
 
-# ==========================================================
-# DECRYPTION BENCHMARK
-# Compute dot product once, benchmark decrypt only
-# ==========================================================
+
 enc_vec    = ts.ckks_vector(context, vector_list)
 dot_result = enc_vec.dot(weights_list)
 
@@ -62,9 +59,7 @@ for _ in range(REPEATS):
 dec_latency_mean = np.mean(dec_times)
 dec_latency_std  = np.std(dec_times)
 
-# ==========================================================
-# ACCURACY (MAE vs plaintext)
-# ==========================================================
+
 plain_dot = np.dot(vector, weights)
 mae       = abs(dec_result[0] - plain_dot)
 
