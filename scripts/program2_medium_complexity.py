@@ -1,47 +1,25 @@
-"""
-Program 2 — Medium Complexity
-Operations : Encrypted dot product (enc_vec · plaintext weights)
-Depth cost : 1 (one ciphertext-ciphertext multiplication via dot product)
-Compatible  : 4096, 8192, 16384
-Note        : Using enc_vec.dot(weights_list) which is a single mul + rotation
-              sum — this is the core operation of the inference pipeline
-"""
 
 import numpy as np
 import time
 import tenseal as ts
 from ckks_utils import create_context
 
-# ==========================================================
-# CONFIGURATION — change POLY_MOD_DEGREE to test each level
-# ==========================================================
+
 POLY_MOD_DEGREE = 16384
 VECTOR_SIZE     = 512
 REPEATS         = 20
 
 np.random.seed(42)
-
-# ==========================================================
-# CONTEXT
-# ==========================================================
 context = create_context(POLY_MOD_DEGREE)
 
-# ==========================================================
-# SYNTHETIC RNA-LIKE DATA
-# vector  : simulates one gene expression sample (feature vector)
-# weights : simulates learned model weights
-# ==========================================================
+
 vector       = np.abs(np.random.normal(loc=50, scale=20, size=VECTOR_SIZE))
 weights      = np.random.normal(loc=0, scale=1, size=VECTOR_SIZE)
 vector_list  = vector.tolist()
 weights_list = weights.tolist()
 
-# Warm-up
-_ = ts.ckks_vector(context, vector_list)
 
-# ==========================================================
-# ENCRYPTION BENCHMARK
-# ==========================================================
+_ = ts.ckks_vector(context, vector_list)
 enc_times = []
 for _ in range(REPEATS):
     start   = time.perf_counter()
