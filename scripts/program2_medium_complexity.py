@@ -30,10 +30,6 @@ for _ in range(REPEATS):
 enc_latency_mean = np.mean(enc_times)
 enc_latency_std  = np.std(enc_times)
 
-# ==========================================================
-# EXECUTION BENCHMARK
-# Re-encrypt each iteration for consistent ciphertext state
-# ==========================================================
 exec_times = []
 for _ in range(REPEATS):
     enc_vec    = ts.ckks_vector(context, vector_list)
@@ -58,21 +54,10 @@ for _ in range(REPEATS):
 
 dec_latency_mean = np.mean(dec_times)
 dec_latency_std  = np.std(dec_times)
-
-
 plain_dot = np.dot(vector, weights)
 mae       = abs(dec_result[0] - plain_dot)
-
-# ==========================================================
-# CIPHERTEXT SIZE
-# ==========================================================
 enc_fresh = ts.ckks_vector(context, vector_list)
 size_kb   = len(enc_fresh.serialize()) / 1024
-
-# ==========================================================
-# OUTPUT
-# ==========================================================
-print("\n========== PROGRAM 2: MEDIUM COMPLEXITY ==========")
 print(f"Operation                 : encrypted dot product")
 print(f"Polynomial Modulus Degree : {POLY_MOD_DEGREE}")
 print(f"Vector Size               : {VECTOR_SIZE}")
@@ -83,4 +68,3 @@ print(f"Execution latency   (ms)  : {exec_latency_mean:.4f}  ± {exec_latency_st
 print(f"Decryption latency  (ms)  : {dec_latency_mean:.4f}  ± {dec_latency_std:.4f}")
 print(f"Ciphertext size     (KB)  : {size_kb:.4f}")
 print(f"MAE                       : {mae:.10f}")
-print("=================================================\n")
