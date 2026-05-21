@@ -175,10 +175,7 @@ def run_config(poly_mod_degree):
     enc_de  = np.abs(diff / (n_a * SCALE_FACTOR))
     mae     = float(np.mean(np.abs(enc_de - pt_de)))
     size_kb = ct_size_kb(result)
-
-    # ==========================================================
-    # OUTPUT  (mirrors program1 print block exactly)
-    # ==========================================================
+    
     print("------------------------------------------------")
     print(f"Encryption latency  (ms)  : {np.mean(enc_times):.4f}  +- {np.std(enc_times):.4f}")
     print(f"Execution latency   (ms)  : {np.mean(exec_times):.4f}  +- {np.std(exec_times):.4f}")
@@ -199,9 +196,6 @@ def run_config(poly_mod_degree):
     row["Notes"] = "VALID" if row["Valid"] else f"FAIL -- MAE {mae:.4e} >= threshold {MAE_THRESHOLD:.4e}"
     return row
 
-# ==========================================================
-# MAIN — loop over all poly_mod_degrees, save CSV
-# ==========================================================
 print("\n" + "=" * 60)
 print("  BFV PARAMETER VALIDATION  --  Phase 2C")
 print("  CKKS vs BFV  --  RNA-Seq DE Scoring")
