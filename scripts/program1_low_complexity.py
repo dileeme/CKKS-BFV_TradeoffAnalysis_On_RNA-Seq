@@ -1,22 +1,3 @@
-"""
-BFV Validation — Phase 2C
-Operations  : Group sum accumulation + ciphertext subtraction (DE scoring)
-Depth cost  : 0 multiplications — additions and subtraction only
-Compatible  : 8192, 16384  (4096 expected excluded — insufficient slots)
-
-Mirrors program1/2/3 CKKS pilot structure exactly.
-Automates across poly_mod_degree = 4096, 8192, 16384 with 6 runs each.
-
-Scaling convention (fixed — cross-scheme comparability with CKKS):
-  encode : round(de_score * SCALE_FACTOR) -> int
-  decode : int / SCALE_FACTOR             -> float
-  SCALE_FACTOR = 10_000
-  Max DE ~0.90 -> max int 9_000
-  Max col sum 50*9_000 = 450_000 < plain_modulus 786_433
-
-Output: results/bfv_validation_results.csv  (columns mirror pilot_results.csv)
-"""
-
 import seal
 from seal import (
     EncryptionParameters, scheme_type, SEALContext,
@@ -27,18 +8,12 @@ import numpy as np
 import pandas as pd
 import os, time, tempfile
 
-# ==========================================================
-# CONFIGURATION
-# ==========================================================
 SCALE_FACTOR     = 10_000
-N_FEATURES       = 500        # top-variance features, fixed from Phase 2
-N_SAMPLES_TEST   = 100        # synthetic batch matching batch_a
+N_FEATURES       = 500        
+N_SAMPLES_TEST   = 100       
 RANDOM_STATE     = 42
-REPEATS          = 6          # matches NumRuns in pilot_results.csv
-MAE_THRESHOLD    = 1.0 / SCALE_FACTOR   # 1e-4 — rounding noise only
-
-# plain_modulus = 786_433  (prime, 3*2^18+1, NTT-friendly)
-# Max intermediate col sum = 50 * 9_000 = 450_000 < 786_433 — safe
+REPEATS          = 6          
+MAE_THRESHOLD    = 1.0 / SCALE_FACTOR   
 PLAIN_MODULUS    = 786433
 POLY_MOD_DEGREES = [4096, 8192, 16384]
 
@@ -47,9 +22,6 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 np.random.seed(RANDOM_STATE)
 
-# ==========================================================
-# CONTEXT
-# ==========================================================
 def create_context(poly_mod_degree, plain_modulus):
     try:
         parms = EncryptionParameters(scheme_type.bfv)
