@@ -1,21 +1,3 @@
-"""
-BFV Validation — Phase 2C
-Operations  : Group sum accumulation + ciphertext subtraction (DE scoring)
-Depth cost  : 0 multiplications — additions and subtraction only
-Compatible  : 8192, 16384  (4096 expected excluded — insufficient slots)
-
-Mirrors program1/2/3 CKKS pilot structure exactly.
-Automates across poly_mod_degree = 4096, 8192, 16384 with 6 runs each.
-
-Scaling convention (fixed — cross-scheme comparability with CKKS):
-  encode : round(de_score * SCALE_FACTOR) -> int
-  decode : int / SCALE_FACTOR             -> float
-  SCALE_FACTOR = 10_000
-  Max DE ~0.90 -> max int 9_000
-  Max col sum 50*9_000 = 450_000 < plain_modulus 786_433
-
-Output: results/bfv_validation_results.csv  (columns mirror pilot_results.csv)
-"""
 
 import seal
 from seal import (
