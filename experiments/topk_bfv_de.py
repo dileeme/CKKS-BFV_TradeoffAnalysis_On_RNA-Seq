@@ -74,10 +74,6 @@ for cfg in CONFIGS:
     for ct in cfg["cancer_types"]:
         group_sizes[ct] = len(df[df["cancer_type"] == ct])
         print(f"  {ct}: n={group_sizes[ct]}")
-
-    # Compute plain_scores using SAME formula as BFV:
-    # abs((sum_A - sum_B) / (n_A * SCALE_FACTOR))
-    # This matches BFV decoding exactly (same rounding, same divisor)
     plain_mat = np.zeros((n_features, len(pairs)), dtype=np.float64)
     for pi, (type_a, type_b) in enumerate(pairs):
         n_a = group_sizes[type_a]
