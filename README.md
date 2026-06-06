@@ -147,11 +147,4 @@ All metrics averaged across 10 runs and reported with ±1 standard deviation. To
 
 ---
 
-## 🎯 Publication Target
-
-**BMC Bioinformatics** — Research Article, Transcriptome analysis category  
-IF: 3.3 (2024) | Desk decision median: ~5 days | Full pipeline: ~4–6 months
-
----
-
 *Last updated: Manuscript in progress. Methods and Results sections complete. Discussion and Conclusion pending.*
