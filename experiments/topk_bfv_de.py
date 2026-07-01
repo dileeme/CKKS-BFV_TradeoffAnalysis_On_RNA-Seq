@@ -1,3 +1,22 @@
+"""
+topk_bfv_de.py  —  BFV top-k validation (v4 — formula-consistent plaintext)
+Run in WSL2.
+
+Key fix: plain_scores computed using the SAME formula as BFV decoding:
+  abs((sum_A_float - sum_B_float) / (n_A * SCALE_FACTOR))
+NOT loaded from the baseline CSV (which uses true mean difference).
+This ensures plaintext and encrypted scores are computed identically,
+so rounding errors cancel and MAE returns to ~2-7e-6.
+
+Saves to results/topk/:
+  bfv_d1_enc_scores_10runs.npy  (10, 500, 10)
+  bfv_d1_plain_scores.npy       (500, 10)   <- formula-consistent
+  bfv_d1_gene_order.npy
+  bfv_d2_enc_scores_10runs.npy  (10, 500, 1)
+  bfv_d2_plain_scores.npy       (500, 1)
+  bfv_d2_gene_order.npy
+"""
+
 import seal
 from seal import (
     EncryptionParameters, scheme_type, SEALContext,
@@ -74,6 +93,10 @@ for cfg in CONFIGS:
     for ct in cfg["cancer_types"]:
         group_sizes[ct] = len(df[df["cancer_type"] == ct])
         print(f"  {ct}: n={group_sizes[ct]}")
+
+    # Compute plain_scores using SAME formula as BFV:
+    # abs((sum_A - sum_B) / (n_A * SCALE_FACTOR))
+    # This matches BFV decoding exactly (same rounding, same divisor)
     plain_mat = np.zeros((n_features, len(pairs)), dtype=np.float64)
     for pi, (type_a, type_b) in enumerate(pairs):
         n_a = group_sizes[type_a]

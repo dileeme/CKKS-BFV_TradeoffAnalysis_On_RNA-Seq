@@ -1,0 +1,9 @@
+ckks_env/
+__pycache__/
+*.pyc
+
+# Large raw datasets, kept locally only (exceed GitHub's file size limits)
+datasets/data.csv
+datasets/labels.csv
+datasets/LUAD_HiSeqV2
+datasets/LUSC_HiSeqV2
