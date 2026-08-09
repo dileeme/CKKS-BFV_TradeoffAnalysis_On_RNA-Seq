@@ -7,7 +7,7 @@
 
 ---
 
-## 📋 Overview
+## Overview
 
 This project benchmarks two Fully Homomorphic Encryption (FHE) schemes — **BFV** and **CKKS** — for computing differential expression (DE) scores on RNA-Seq cancer gene expression data under encryption. The goal is to produce a systematic tradeoff analysis of computational performance, ciphertext storage overhead, and approximation accuracy across varying polynomial modulus degrees and dataset sizes.
 
@@ -15,13 +15,13 @@ The encrypted operation is a **depth-1 computation**: encrypted group mean per c
 
 ---
 
-## 🧬 Research Question
+## Research Question
 
 > How do FHE scheme choice (BFV vs CKKS), polynomial modulus degree, and dataset size influence computational performance, ciphertext storage overhead, and approximation accuracy when applied to differential expression scoring on RNA-Seq gene expression data?
 
 ---
 
-## ⚙️ Preprocessing Pipeline
+## Preprocessing Pipeline
 
 ```
 Raw expression matrix
@@ -35,7 +35,7 @@ All preprocessing performed in plaintext prior to encryption. No preprocessing o
 
 ---
 
-## 🔬 Encryption Schemes
+## Encryption Schemes
 
 | Scheme | Arithmetic | PMD Tested | Notes |
 |---|---|---|---|
@@ -46,7 +46,7 @@ All configurations verified compliant with **128-bit classical security** as def
 
 ---
 
-## 📐 HE Parameter Configurations
+## HE Parameter Configurations
 
 | Scheme | N (PMD) | Coefficient Modulus | Scale | Security |
 |---|---|---|---|---|
@@ -58,7 +58,7 @@ All configurations verified compliant with **128-bit classical security** as def
 
 ---
 
-## 🧪 Experiment Matrix
+## Experiment Matrix
 
 **Total: 300 runs (5 configs × 3 cohort sizes × 2 datasets × 10 runs)**
 
@@ -71,7 +71,7 @@ All configurations verified compliant with **128-bit classical security** as def
 
 ---
 
-## 📏 Metrics Per Run
+## Metrics Per Run
 
 | Metric | Description |
 |---|---|
@@ -86,21 +86,21 @@ All metrics averaged across 10 runs and reported with ±1 standard deviation. To
 --
 
 
-## 🚦 Phase Status
+## Phase Status
 
 | Phase | Description | Status |
 |---|---|---|
-| Phase 1 | Pilot study — CKKS parameter validation, 4096 exclusion documented | ✅ Complete |
-| Phase 2 | Dataset 1 prep, batching, plaintext DE baselines | ✅ Complete |
-| Phase 2B | Dataset 2 (TCGA LUSC+LUAD via Xena) prep and baselines | ✅ Complete |
-| Phase 3 | CKKS experiments — both datasets | ✅ Complete |
-| Phase 3B | BFV experiments — both datasets | ✅ Complete |
-| Phase 4 | Analysis, visualisations (5 plots) | ✅ Complete |
-| Phase 5 | Literature review, novelty positioning | ✅ Complete |
+| Phase 1 | Pilot study — CKKS parameter validation, 4096 exclusion documented | ✅ |
+| Phase 2 | Dataset 1 prep, batching, plaintext DE baselines | ✅  |
+| Phase 2B | Dataset 2 (TCGA LUSC+LUAD via Xena) prep and baselines | ✅ |
+| Phase 3 | CKKS experiments — both datasets | ✅ |
+| Phase 3B | BFV experiments — both datasets | ✅ |
+| Phase 4 | Analysis, visualisations (5 plots) | ✅ |
+| Phase 5 | Literature review, novelty positioning | ✅  |
 
 --
 
-## 📊 Key Results Summary
+## Key Results Summary
 
 | Scheme | N | Dataset | Total Latency (ms) | CT Size (KB) | MAE |
 |---|---|---|---|---|---|
@@ -119,7 +119,7 @@ All metrics averaged across 10 runs and reported with ±1 standard deviation. To
 
 ---
 
-## 🖥️ Environment
+## Environment
 
 | Property | Value |
 |---|---|
@@ -132,7 +132,7 @@ All metrics averaged across 10 runs and reported with ±1 standard deviation. To
 
 ---
 
-## 📚 Key References
+## Key References
 
 | Reference | Role |
 |---|---|
