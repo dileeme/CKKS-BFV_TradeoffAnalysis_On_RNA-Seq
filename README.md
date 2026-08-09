@@ -1,4 +1,4 @@
-# 🔐 BFV / CKKS FHE Tradeoff Analysis
+# BFV / CKKS FHE Tradeoff Analysis
 ### Differential Expression Scoring on RNA-Seq Gene Expression Data
 
 > **Author:** Dilen Shankar  
