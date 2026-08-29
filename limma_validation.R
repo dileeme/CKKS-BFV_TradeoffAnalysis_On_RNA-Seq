@@ -1,6 +1,5 @@
 
 library(limma)
-
 cat("Loading LUAD and LUSC expression data...\n")
 
 luad <- read.table("datasets/LUAD_HiSeqV2",
